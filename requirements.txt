@@ -1,0 +1,32 @@
+# ====================================================================
+# Requirements for Stroke-Based-Scene-Text-Erasing (Updated for newer Python & ONNX Export)
+# ====================================================================
+
+# --- PyTorch / Torchvision ---
+# 중요: 아래 버전은 참조용입니다. 먼저 PyTorch 공식 웹사이트에서
+# 사용자의 시스템(OS, CUDA 버전 또는 CPU)에 맞는 설치 명령어를 확인하고 실행하세요.
+# https://pytorch.org/get-started/locally/
+# 예시 (CUDA 11.8): pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu118
+# 예시 (CPU): pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1
+#
+# 아래 명시된 버전은 위 명령어로 설치한 후 pip이 인식하도록 하기 위함입니다.
+torch==2.5.1
+torchvision==0.20.1
+
+# --- Core Dependencies ---
+# 참조 목록에서 가져온 업데이트된 버전
+numpy==1.26.4
+opencv-python==4.11.0.86
+scikit_image==0.24.0
+tqdm==4.67.1
+
+# --- ONNX Export & Runtime Dependencies ---
+# PyTorch 모델을 ONNX 형식으로 변환하고 실행하기 위한 라이브러리
+onnx==1.17.0          # ONNX 모델 형식 정의 및 저장/로드
+onnxruntime==1.18.1   # ONNX 모델 실행 엔진 (CPU 기본)
+# 참고: GPU에서 ONNX 모델을 실행하려면 'onnxruntime-gpu' 설치가 필요할 수 있습니다.
+
+# ====================================================================
+# 참고: 이 파일은 원래 프로젝트의 직접적인 의존성 및 ONNX 관련 필수 패키지만 포함합니다.
+# 제공해주신 긴 목록의 다른 패키지들은 이 프로젝트에 필요하지 않을 수 있습니다.
+# ====================================================================
