@@ -3,6 +3,7 @@ gpu = '0'  # '0,1,2,3'
 finetune = False  # False True
 resume = False  # False True
 resume_path = './ckpt/saved_models/20.pth'
+use_cuda = True  # False True
 
 ### TRAINING PARAMETERS ###
 max_epoch = 30
