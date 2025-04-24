@@ -83,32 +83,86 @@ def cal_Width_Height(Poly):
     return max(int(widthA), int(widthB)), max(int(heightA), int(heightB)),\
            (widthA+widthB)/2, (heightA+heightB)/2
 
-def expand_roi(Poly, img_width=512, img_height=512, ratio=0.2):
+def expand_roi(Poly, img_width, img_height, ratio=0.2):
+    """
+    원본 expand_roi 로직을 그대로 포팅. 
+    Poly: (4,2) 순서 tl, tr, br, bl
+    img_width, img_height: 원본 이미지 크기
+    """
     c_x, c_y = cross_point(Poly)
-    expand_poly = np.zeros((4,2), dtype="float32")
-    for i, (x,y) in enumerate(Poly):
-        dx, dy = x-c_x, y-c_y
+    expand_poly = np.zeros((4, 2), dtype="float32")
+    
+    for i, (x, y) in enumerate(Poly):
+        dx, dy = x - c_x, y - c_y
         dis = np.hypot(dx, dy) * ratio
-        ang = abs(np.arctan2(dy, dx))
-        ex = x +  dis*np.cos(ang) * np.sign(dx)
-        ey = y +  dis*np.sin(ang) * np.sign(dy)
-        expand_poly[i] = [np.clip(ex, 0, img_width-1), np.clip(ey, 0, img_height-1)]
+        ang = abs(np.arctan2(dy, dx))  # arctan2으로 방향 안정화
+        # 기본 확장
+        ex = x + dis * np.cos(ang)
+        ey = y + dis * np.sin(ang)
+        # 사분면별 조정 (원본 코드와 동일)
+        if dy < 0 and dx < 0:
+            ex, ey = x - abs(dis*np.cos(ang)), y - abs(dis*np.sin(ang))
+        elif dy < 0 and dx > 0:
+            ex, ey = x + abs(dis*np.cos(ang)), y - abs(dis*np.sin(ang))
+        elif dy >= 0 and dx <= 0:
+            ex, ey = x - abs(dis*np.cos(ang)), y + abs(dis*np.sin(ang))
+        # 아니라면 기본 ex,ey 유지
+        
+        expand_poly[i] = [ex, ey]
+    
+    # 올바른 클램핑
+    expand_poly[:, 0] = np.clip(expand_poly[:, 0], 0, img_width - 1)
+    expand_poly[:, 1] = np.clip(expand_poly[:, 1], 0, img_height - 1)
+    
     return expand_poly
 
-def four_point_transform(image, pts):
-    quad = pts.astype(np.float32)
+
+def four_point_transform(image: np.ndarray, pts: np.ndarray):
+    """
+    pts: (4,2) array — 항상 (tl, tr, br, bl) 형태여야 합니다.
+    반환:
+      warped     : 잘린(perspective transformed) 패치
+      expand_quad: 확장 후 4개 포인트
+      dst_rect   : warping 대상 사각형
+    """
+    # 1) 원본 quad 및 크기 계산
+    quad = np.array(pts, dtype=np.float32)
+    tl, tr, br, bl = quad
     maxW, maxH, meanW, meanH = cal_Width_Height(quad)
-    if meanW >= meanH:
-        H_target = maxH
+    
+    # 2) 세로가 더 긴 박스면 90도 회전
+    if meanW < meanH:
+        quad = np.stack([tr, br, bl, tl], axis=0)
+        maxW, maxH = maxH, maxW  # 너비·높이 스왑
+    # 이제 quad는 (tl, tr, br, bl) 순서
+    
+    # 3) 확장 비율 결정 (원본 로직 그대로)
+    H_box = maxH
+    if H_box < 10:
+        R = 1.0
+    elif H_box < 15:
+        R = 0.8
+    elif H_box < 20:
+        R = 0.3
     else:
-        quad = quad[[1,2,3,0]]
-        H_target = maxW
-    R = 0.2 if H_target >= 20 else (0.3 if H_target>=15 else (0.8 if H_target>=10 else 1.0))
-    exp_quad = expand_roi(quad, image.shape[1], image.shape[0], ratio=R)
-    maxW, maxH, _, _ = cal_Width_Height(exp_quad)
-    dst_rect = np.array([[0,0],[maxW-1,0],[maxW-1,maxH-1],[0,maxH-1]], dtype="float32")
+        R = 0.2
+    
+    # 4) expand & recalc size
+    exp_quad = expand_roi(quad, img_width=image.shape[1], img_height=image.shape[0], ratio=R)
+    w2, h2, _, _ = cal_Width_Height(exp_quad)
+    
+    # 5) 타깃 rect 정의
+    dst_rect = np.array([
+        [0,      0],
+        [w2 - 1, 0],
+        [w2 - 1, h2 - 1],
+        [0,      h2 - 1]
+    ], dtype=np.float32)
+    
+    # 6) 변환 매트릭스 & 크롭
     M = cv2.getPerspectiveTransform(exp_quad, dst_rect)
-    warped = cv2.warpPerspective(image, M, (maxW, maxH), flags=cv2.INTER_CUBIC)
+    warped = cv2.warpPerspective(image, M, (w2, h2), flags=cv2.INTER_CUBIC)
+    
     return warped, exp_quad, dst_rect
 
 # --- ONNX 추론 파트 ---
